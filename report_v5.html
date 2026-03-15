@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Chart Report Maker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Georgia',serif;background:#0a0a0a;color:#f0ede6;min-height:100vh}
+.wrap{max-width:1000px;margin:0 auto;padding:40px 24px}
+.header{margin-bottom:36px}
+.header h1{font-size:28px;font-weight:400;color:#f0ede6;letter-spacing:-0.5px}
+.header p{font-size:12px;color:#444;font-family:monospace;margin-top:4px}
+
+/* Steps */
+.steps{display:flex;align-items:center;margin-bottom:32px;overflow-x:auto;padding-bottom:4px;gap:0}
+.step{display:flex;align-items:center;gap:8px;padding:9px 18px;border-radius:8px;transition:all .2s;white-space:nowrap;opacity:0.3;cursor:default}
+.step.done{opacity:0.65;cursor:pointer}
+.step.done:hover{opacity:0.9}
+.step.active{opacity:1;background:#141414;border:1px solid #222}
+.step-num{width:22px;height:22px;border-radius:50%;background:#222;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:monospace;color:#555;flex-shrink:0}
+.step.active .step-num{background:#c8a96e;color:#0a0a0a}
+.step.done .step-num{background:#7ec8a9;color:#0a0a0a}
+.step-text{font-size:11px;color:#777;font-family:monospace}
+.step.active .step-text{color:#c8a96e}
+.step-arrow{color:#222;font-size:13px;padding:0 2px;flex-shrink:0}
+
+/* Cards */
+.card{background:#141414;border:1px solid #1e1e1e;border-radius:14px;padding:26px;margin-bottom:18px}
+.card-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#444;margin-bottom:18px;font-family:monospace;display:flex;align-items:center;gap:8px}
+.cdot{width:5px;height:5px;border-radius:50%;background:#c8a96e;flex-shrink:0}
+
+/* Upload */
+.upload-zone{border:2px dashed #1e1e1e;border-radius:10px;padding:48px 24px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:#0d0d0d}
+.upload-zone:hover,.upload-zone.drag{border-color:#c8a96e;background:#0f0d00}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.uz-icon{font-size:32px;margin-bottom:12px;display:block;opacity:0.4}
+.uz-title{font-size:14px;color:#666;margin-bottom:5px}
+.uz-sub{font-size:11px;color:#2a2a2a;font-family:monospace}
+.uz-file{font-size:12px;color:#c8a96e;font-family:monospace;margin-top:10px;display:none}
+.file-pills{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+.fp{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:7px;padding:7px 14px;font-size:11px;font-family:monospace;color:#555}
+.fp b{color:#c8a96e}
+
+/* Currency auto-detect badge */
+.cur-detect{display:inline-flex;align-items:center;gap:8px;background:#0f0d00;border:1px solid #3a2a00;border-radius:8px;padding:8px 14px;font-size:12px;font-family:monospace;color:#c8a96e;margin-top:12px}
+.cur-detect-label{font-size:10px;color:#555;font-family:monospace;margin-top:6px}
+
+/* Step panels */
+.step-panel{display:none}
+.step-panel.active{display:block}
+
+/* Selects */
+.select-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:600px){.select-grid{grid-template-columns:1fr}}
+.sg{display:flex;flex-direction:column;gap:6px}
+.sg-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#444;font-family:monospace}
+select{background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;color:#f0ede6;font-family:monospace;font-size:13px;padding:10px 14px;outline:none;cursor:pointer;width:100%;transition:border .2s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
+select:focus{border-color:#c8a96e}
+select[multiple]{min-height:130px;background-image:none;padding-right:14px}
+select[multiple] option{padding:6px 10px;border-radius:4px;margin:1px 0}
+select[multiple] option:checked{background:#1a1200;color:#c8a96e}
+
+/* Chart type grid */
+.ct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:8px}
+.ct-btn{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:9px;padding:11px 6px;font-size:10px;font-family:monospace;color:#444;cursor:pointer;transition:all .15s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+.ct-btn:hover{border-color:#333;color:#777}
+.ct-btn.on{border-color:#c8a96e;color:#c8a96e;background:#0f0d00}
+.ct-icon{font-size:18px;line-height:1}
+
+/* Buttons */
+.btn{background:#c8a96e;color:#0a0a0a;border:none;border-radius:8px;padding:11px 26px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;font-family:monospace}
+.btn:hover{background:#dfc080;transform:translateY(-1px)}
+.btn:active{transform:none}
+.btn-outline{background:transparent;border:1px solid #222;color:#555;border-radius:8px;padding:11px 18px;font-size:12px;cursor:pointer;font-family:monospace;transition:all .15s}
+.btn-outline:hover{border-color:#444;color:#888}
+.btn-pdf{background:transparent;border:1px solid #c8a96e;color:#c8a96e;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;font-family:monospace;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-pdf:hover{background:#c8a96e;color:#0a0a0a}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:center}
+
+/* Preview table */
+.tw{overflow-x:auto;border-radius:8px;border:1px solid #161616}
+table{width:100%;border-collapse:collapse;font-size:11px;font-family:monospace}
+th{background:#0d0d0d;color:#c8a96e;padding:7px 12px;text-align:left;border-bottom:1px solid #161616;white-space:nowrap;font-weight:400}
+td{padding:6px 12px;border-bottom:1px solid #0f0f0f;color:#555;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#141414;color:#888}
+.tb{font-size:9px;padding:1px 5px;border-radius:3px;margin-left:5px}
+.tb-n{background:#1a1200;color:#c8a96e}
+.tb-d{background:#0a1a14;color:#7ec8a9}
+.tb-t{background:#111;color:#444}
+
+/* Stats */
+.sg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.stat{background:#0f0f0f;border:1px solid #161616;border-radius:9px;padding:14px;text-align:center}
+.sv{font-size:19px;font-weight:300;color:#c8a96e;display:block;letter-spacing:-0.5px}
+.sl{font-size:9px;color:#333;text-transform:uppercase;letter-spacing:1px;font-family:monospace;margin-top:3px;display:block}
+
+/* Charts grid */
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px}
+@media(max-width:600px){.cg{grid-template-columns:1fr}}
+.cc{background:#0f0f0f;border:1px solid #161616;border-radius:11px;padding:18px}
+.cc-title{font-size:12px;color:#c8a96e;font-family:monospace;margin-bottom:2px}
+.cc-why{font-size:10px;color:#2a2a2a;font-family:monospace;margin-bottom:12px;line-height:1.5}
+.cc canvas{max-height:230px!important}
+.cc-full{grid-column:1/-1}
+
+/* Insights */
+.ib{background:#0f0f0f;border-left:2.5px solid #c8a96e;border-radius:0 8px 8px 0;padding:13px 16px;margin-bottom:10px}
+.ib p{font-size:13px;line-height:1.85;color:#888}
+.ib strong{color:#dfc080}
+.ib-label{font-size:9px;color:#c8a96e;font-family:monospace;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
+
+/* Tags */
+.tag{display:inline-block;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:20px;font-size:10px;color:#444;padding:3px 10px;font-family:monospace;margin:2px}
+.tag.hl{border-color:#c8a96e;color:#c8a96e}
+
+/* Misc */
+.sec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.badge{display:inline-flex;align-items:center;gap:5px;background:#0f0d00;border:1px solid #3a2800;border-radius:20px;padding:4px 11px;font-size:10px;color:#c8a96e;font-family:monospace}
+.pulse{width:5px;height:5px;background:#c8a96e;border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
+.error{background:#110808;border:1px solid #220f0f;border-radius:8px;padding:11px 14px;color:#e88;font-size:12px;font-family:monospace;margin-top:10px}
+.hint{font-size:11px;color:#2a2a2a;font-family:monospace;margin-top:6px;line-height:1.6}
+.divider{height:1px;background:#161616;margin:18px 0}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeUp .3s ease forwards}
+#outputSection{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <h1>Chart Report Maker</h1>
+    <p>// Upload Excel · AI builds your full report automatically</p>
+  </div>
+
+  <!-- STEP INDICATOR — clicking done steps goes back -->
+  <div class="steps">
+    <div class="step active" id="si1" onclick="stepClick(1)">
+      <div class="step-num">1</div><div class="step-text">Upload file</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="si2" onclick="stepClick(2)">
+      <div class="step-num">2</div><div class="step-text">Configure</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="si3" onclick="stepClick(3)">
+      <div class="step-num">3</div><div class="step-text">Report</div>
+    </div>
+  </div>
+
+  <!-- STEP 1: UPLOAD -->
+  <div class="step-panel active" id="panel1">
+    <div class="card">
+      <div class="card-title"><span class="cdot"></span>Upload your data file</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0])"/>
+        <span class="uz-icon">📊</span>
+        <div class="uz-title">Drop your Excel or CSV file here</div>
+        <div class="uz-sub">Supports .xlsx · .xls · .csv — any size, any number of columns</div>
+        <div class="uz-file" id="uzFile"></div>
+      </div>
+      <div class="file-pills" id="filePills" style="display:none">
+        <div class="fp">Rows: <b id="infoRows">—</b></div>
+        <div class="fp">Columns: <b id="infoCols">—</b></div>
+        <div class="fp">Sheet: <b id="infoSheet">—</b></div>
+        <div class="fp">Currency: <b id="infoCur">—</b></div>
+      </div>
+      <div id="uploadError"></div>
+    </div>
+  </div>
+
+  <!-- STEP 2: CONFIGURE -->
+  <div class="step-panel" id="panel2">
+    <div class="card">
+      <div class="card-title"><span class="cdot"></span>Data preview</div>
+      <div class="tw" id="previewTable"></div>
+      <p class="hint" id="previewHint"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="cdot"></span>Configure your report</div>
+
+      <div class="select-grid">
+        <div class="sg">
+          <div class="sg-label">Category / Label column (X axis)</div>
+          <select id="labelSelect" onchange="onLabelChange()"></select>
+          <p class="hint">Usually months, products, names, regions</p>
+        </div>
+        <div class="sg">
+          <div class="sg-label">Value columns — hold Ctrl to pick multiple</div>
+          <select id="valueSelect" multiple></select>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- AUTO CURRENCY DISPLAY — no buttons, AI detected -->
+      <div class="sg" style="margin-bottom:18px">
+        <div class="sg-label">Currency — auto detected from your data</div>
+        <div class="cur-detect" id="curDetect">
+          <span id="curSymbol">₹</span>
+          <span id="curName">INR — Indian Rupee detected</span>
+        </div>
+        <p class="hint" id="curHint">AI scanned your data columns and detected the currency automatically.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="sg">
+        <div class="sg-label" style="margin-bottom:8px">Chart types to include — click to toggle on/off</div>
+        <div class="ct-grid" id="ctGrid">
+          <button class="ct-btn on" data-ct="bar" onclick="toggleCT(this)"><span class="ct-icon">📊</span>Bar</button>
+          <button class="ct-btn on" data-ct="hbar" onclick="toggleCT(this)"><span class="ct-icon">📉</span>H-Bar</button>
+          <button class="ct-btn on" data-ct="line" onclick="toggleCT(this)"><span class="ct-icon">📈</span>Line</button>
+          <button class="ct-btn on" data-ct="area" onclick="toggleCT(this)"><span class="ct-icon">🏔️</span>Area</button>
+          <button class="ct-btn on" data-ct="pie" onclick="toggleCT(this)"><span class="ct-icon">🥧</span>Pie</button>
+          <button class="ct-btn on" data-ct="doughnut" onclick="toggleCT(this)"><span class="ct-icon">🍩</span>Doughnut</button>
+          <button class="ct-btn on" data-ct="radar" onclick="toggleCT(this)"><span class="ct-icon">🕸️</span>Radar</button>
+          <button class="ct-btn on" data-ct="scatter" onclick="toggleCT(this)"><span class="ct-icon">✦</span>Scatter</button>
+        </div>
+        <p class="hint">Gold = included in report. Click any chart type to remove it.</p>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" onclick="generateReport()">Generate Full Report</button>
+        <button class="btn-outline" onclick="setStep(1)">← Change file</button>
+      </div>
+      <div id="reportError"></div>
+    </div>
+  </div>
+
+  <!-- STEP 3: OUTPUT -->
+  <div id="outputSection">
+
+    <!-- Back bar — always visible at top of report -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap">
+      <button class="btn-outline" onclick="setStep(2)">← Edit settings</button>
+      <button class="btn-outline" onclick="setStep(1)">← Upload new file</button>
+      <span style="font-size:11px;color:#333;font-family:monospace;margin-left:4px">Changes won't affect this report until you click Generate again</span>
+    </div>
+
+    <!-- NATURAL LANGUAGE QUERY BOX -->
+    <div class="card fade" id="nlCard">
+      <div class="card-title"><span class="cdot"></span>Ask your data anything</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="nlInput" placeholder='Try: "show top 5 by revenue" · "filter only Jan to Mar" · "which product has lowest sales" · "compare Q1 vs Q2"'
+          style="flex:1;background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;color:#f0ede6;font-family:monospace;font-size:12px;padding:11px 14px;outline:none;min-width:200px;transition:border .2s"
+          onfocus="this.style.borderColor='#c8a96e'" onblur="this.style.borderColor='#1e1e1e'"
+          onkeydown="if(event.key==='Enter')runNL()"/>
+        <button class="btn" onclick="runNL()" style="white-space:nowrap">Ask AI</button>
+        <button class="btn-outline" onclick="resetNL()" id="nlResetBtn" style="display:none">Reset filter</button>
+      </div>
+      <div id="nlSuggestions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <span style="font-size:10px;color:#333;font-family:monospace;padding-top:4px">Try →</span>
+      </div>
+      <div id="nlResult" style="margin-top:10px;font-size:12px;font-family:monospace;color:#7ec8a9;display:none"></div>
+      <div id="nlError" style="margin-top:8px;font-size:12px;font-family:monospace;color:#e88;display:none"></div>
+    </div>
+
+    <div class="card fade">
+      <div class="sec-head">
+        <div class="card-title" style="margin-bottom:0"><span class="cdot"></span>Dataset summary</div>
+        <div class="badge"><span class="pulse"></span><span id="summaryBadge">Analysed</span></div>
+      </div>
+      <div class="sg-grid" id="statsGrid"></div>
+      <div id="tagsRow" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card fade">
+      <div class="sec-head">
+        <div class="card-title" style="margin-bottom:0"><span class="cdot"></span>Charts</div>
+        <button class="btn-pdf" onclick="downloadPDF()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PDF
+        </button>
+      </div>
+      <div class="cg" id="chartsGrid"></div>
+    </div>
+
+    <div class="card fade">
+      <div class="card-title"><span class="cdot"></span>AI insights</div>
+      <div id="insightsContainer"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──
+let allData=[], headers=[], colTypes={};
+let activeCurrency='NONE';
+let enabledCT=new Set(['bar','hbar','line','area','pie','doughnut','radar','scatter']);
+let chartInst={};
+
+// ── Currency definitions ──
+const CUR={
+  INR:{symbol:'₹',name:'INR — Indian Rupee',fmt:n=>{
+    if(isNaN(n)||n===null)return'—';
+    if(Math.abs(n)>=10000000)return'₹'+(n/10000000).toFixed(2)+'Cr';
+    if(Math.abs(n)>=100000)return'₹'+(n/100000).toFixed(2)+'L';
+    if(Math.abs(n)>=1000)return'₹'+n.toLocaleString('en-IN',{maximumFractionDigits:2});
+    return'₹'+(+n.toFixed(2));
+  }},
+  USD:{symbol:'$',name:'USD — US Dollar',fmt:n=>{
+    if(isNaN(n)||n===null)return'—';
+    if(Math.abs(n)>=1000000000)return'$'+(n/1000000000).toFixed(2)+'B';
+    if(Math.abs(n)>=1000000)return'$'+(n/1000000).toFixed(2)+'M';
+    if(Math.abs(n)>=1000)return'$'+n.toLocaleString('en-US',{maximumFractionDigits:2});
+    return'$'+(+n.toFixed(2));
+  }},
+  EUR:{symbol:'€',name:'EUR — Euro',fmt:n=>{
+    if(isNaN(n)||n===null)return'—';
+    if(Math.abs(n)>=1000000)return'€'+(n/1000000).toFixed(2)+'M';
+    if(Math.abs(n)>=1000)return'€'+n.toLocaleString('en-DE',{maximumFractionDigits:2});
+    return'€'+(+n.toFixed(2));
+  }},
+  GBP:{symbol:'£',name:'GBP — British Pound',fmt:n=>{
+    if(isNaN(n)||n===null)return'—';
+    if(Math.abs(n)>=1000000)return'£'+(n/1000000).toFixed(2)+'M';
+    if(Math.abs(n)>=1000)return'£'+n.toLocaleString('en-GB',{maximumFractionDigits:2});
+    return'£'+(+n.toFixed(2));
+  }},
+  NONE:{symbol:'',name:'No currency',fmt:n=>{
+    if(isNaN(n)||n===null)return'—';
+    if(Math.abs(n)>=1000000000)return(n/1000000000).toFixed(2)+'B';
+    if(Math.abs(n)>=1000000)return(n/1000000).toFixed(2)+'M';
+    if(Math.abs(n)>=1000)return n.toLocaleString('en-IN',{maximumFractionDigits:2});
+    return(+n.toFixed(2)).toString();
+  }}
+};
+
+function fmt(n){return(CUR[activeCurrency]||CUR.NONE).fmt(n);}
+
+// ── AUTO DETECT CURRENCY from data ──
+function detectCurrency(data, headers){
+  // Check column headers for currency keywords
+  const allText = headers.join(' ').toLowerCase();
+  const sampleVals = headers.flatMap(h=>data.slice(0,20).map(r=>String(r[h]||'')));
+  const allSample = sampleVals.join(' ');
+
+  // Check for currency symbols in actual cell values
+  if(allSample.includes('₹')||allText.includes('inr')||allText.includes('rupee')||allText.includes('rs.')||allText.includes('lakh')||allText.includes('crore')) return 'INR';
+  if(allSample.includes('$')||allText.includes('usd')||allText.includes('dollar')) return 'USD';
+  if(allSample.includes('€')||allText.includes('eur')||allText.includes('euro')) return 'EUR';
+  if(allSample.includes('£')||allText.includes('gbp')||allText.includes('pound')) return 'GBP';
+
+  // Check column names for money keywords — default to INR for Indian context
+  const moneyKW=['revenue','sales','profit','cost','price','amount','income','expense','budget','salary','payment','fee','charge','earning','turnover','gross','net'];
+  if(moneyKW.some(k=>allText.includes(k))) return 'INR'; // default to INR since tool targets India
+
+  return 'NONE';
+}
+
+function updateCurDisplay(){
+  const c=CUR[activeCurrency]||CUR.NONE;
+  document.getElementById('curSymbol').textContent=c.symbol||'—';
+  document.getElementById('curName').textContent=c.name;
+  if(activeCurrency==='NONE'){
+    document.getElementById('curHint').textContent='No currency symbols detected in your data. Numbers shown as plain values.';
+  } else {
+    document.getElementById('curHint').textContent=`AI detected ${c.name} from your column names and data values.`;
+  }
+}
+
+// ── Chart type toggle ──
+function toggleCT(btn){
+  const ct=btn.dataset.ct;
+  if(enabledCT.has(ct)){enabledCT.delete(ct);btn.classList.remove('on');}
+  else{enabledCT.add(ct);btn.classList.add('on');}
+}
+
+// ── Step navigation — clicking step indicators goes back ──
+function stepClick(n){
+  const ind=document.getElementById('si'+n);
+  if(ind.classList.contains('done')||ind.classList.contains('active')) setStep(n);
+}
+
+function setStep(n){
+  // Always allow going back to 1 or 2
+  // Only go to 3 if report has been generated
+  [1,2].forEach(i=>{
+    document.getElementById('panel'+i).classList.toggle('active',i===n);
+  });
+  [1,2,3].forEach(i=>{
+    const ind=document.getElementById('si'+i);
+    ind.classList.remove('active','done');
+    if(i===n) ind.classList.add('active');
+    else if(i<n) ind.classList.add('done');
+  });
+  if(n===3){
+    document.getElementById('outputSection').style.display='block';
+    // Hide configure panel, hide upload panel
+    document.getElementById('panel1').classList.remove('active');
+    document.getElementById('panel2').classList.remove('active');
+  } else {
+    document.getElementById('outputSection').style.display='none';
+    document.getElementById('panel'+n).classList.add('active');
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── Drag drop ──
+const zone=document.getElementById('uploadZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+
+// ── File handling ──
+function handleFile(file){
+  if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['xlsx','xls','csv'].includes(ext)){
+    document.getElementById('uploadError').innerHTML='<div class="error">Please upload .xlsx, .xls, or .csv file.</div>';
+    return;
+  }
+  document.getElementById('uploadError').innerHTML='';
+  document.getElementById('uzFile').textContent='📎 '+file.name;
+  document.getElementById('uzFile').style.display='block';
+  const reader=new FileReader();
+  reader.onload=e=>parseFile(e.target.result);
+  reader.readAsArrayBuffer(file);
+}
+
+function isDateLike(v){
+  const s=String(v).toLowerCase();
+  if(['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].some(m=>s.includes(m)))return true;
+  if(['january','february','march','april','june','july','august','september','october','november','december'].some(m=>s.includes(m)))return true;
+  if(/^\d{4}$/.test(s.trim())&&parseInt(s)>=1990&&parseInt(s)<=2030)return true;
+  if(/q[1-4]/i.test(s))return true;
+  if(/\d{1,2}[\/\-]\d{1,2}/.test(s))return true;
+  if(['monday','tuesday','wednesday','thursday','friday','saturday','sunday','mon','tue','wed','thu','fri','sat','sun'].some(d=>s.includes(d)))return true;
+  return false;
+}
+
+function parseFile(buffer){
+  try{
+    const wb=XLSX.read(buffer,{type:'array',cellDates:true});
+    const sn=wb.SheetNames[0];
+    const raw=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:false});
+    if(!raw.length){document.getElementById('uploadError').innerHTML='<div class="error">File is empty.</div>';return;}
+    allData=raw; headers=Object.keys(raw[0]);
+    colTypes={};
+    headers.forEach(h=>{
+      const vals=raw.map(r=>r[h]).filter(v=>v!=='');
+      const numC=vals.filter(v=>!isNaN(parseFloat(String(v).replace(/[₹$€£,%\s,]/g,'')))).length;
+      const dateC=vals.filter(v=>isDateLike(v)).length;
+      if(dateC/vals.length>0.55) colTypes[h]='date';
+      else if(numC/vals.length>0.65) colTypes[h]='number';
+      else colTypes[h]='text';
+    });
+
+    // Auto detect currency
+    activeCurrency=detectCurrency(raw,headers);
+    updateCurDisplay();
+
+    document.getElementById('infoRows').textContent=raw.length.toLocaleString();
+    document.getElementById('infoCols').textContent=headers.length;
+    document.getElementById('infoSheet').textContent=wb.SheetNames[0];
+    document.getElementById('infoCur').textContent=(CUR[activeCurrency]||CUR.NONE).symbol||'None';
+    document.getElementById('filePills').style.display='flex';
+
+    buildPreview(raw);
+    buildSelects();
+
+    // Mark step 1 as done, go to step 2
+    document.getElementById('si1').classList.remove('active');
+    document.getElementById('si1').classList.add('done');
+    setStep(2);
+  }catch(e){
+    document.getElementById('uploadError').innerHTML=`<div class="error">Error reading file: ${e.message}</div>`;
+  }
+}
+
+function buildPreview(data){
+  const rows=data.slice(0,8);
+  let html='<table><thead><tr>';
+  headers.forEach(h=>{
+    const tc=colTypes[h]==='number'?'tb-n':colTypes[h]==='date'?'tb-d':'tb-t';
+    html+=`<th>${h}<span class="tb ${tc}">${colTypes[h]}</span></th>`;
+  });
+  html+='</tr></thead><tbody>';
+  rows.forEach(r=>{html+='<tr>'+headers.map(h=>`<td>${r[h]!==''?r[h]:'—'}</td>`).join('')+'</tr>';});
+  html+='</tbody></table>';
+  document.getElementById('previewTable').innerHTML=html;
+  document.getElementById('previewHint').textContent=
+    `First ${Math.min(8,data.length)} of ${data.length.toLocaleString()} rows shown · Gold = number · Green = date/time · Gray = text`;
+}
+
+function buildSelects(){
+  const textC=headers.filter(h=>colTypes[h]==='text');
+  const dateC=headers.filter(h=>colTypes[h]==='date');
+  const numC=headers.filter(h=>colTypes[h]==='number');
+
+  const lSel=document.getElementById('labelSelect');
+  lSel.innerHTML='';
+  headers.forEach(h=>{
+    const o=document.createElement('option');
+    o.value=h; o.textContent=`${h}  (${colTypes[h]})`;
+    lSel.appendChild(o);
+  });
+  if(dateC.length) lSel.value=dateC[0];
+  else if(textC.length){
+    const best=textC.reduce((b,h)=>new Set(allData.map(r=>r[h])).size>new Set(allData.map(r=>r[b])).size?h:b,textC[0]);
+    lSel.value=best;
+  }
+  buildValueSelect(lSel.value);
+}
+
+function buildValueSelect(lbl){
+  const numC=headers.filter(h=>colTypes[h]==='number'&&h!==lbl);
+  const vSel=document.getElementById('valueSelect');
+  vSel.innerHTML='';
+  const cols=numC.length?numC:headers.filter(h=>h!==lbl).slice(0,4);
+  cols.forEach(h=>{
+    const o=document.createElement('option');
+    o.value=h; o.textContent=h; o.selected=true;
+    vSel.appendChild(o);
+  });
+}
+
+function onLabelChange(){buildValueSelect(document.getElementById('labelSelect').value);}
+
+// ── Palette ──
+const PAL=['#c8a96e','#7ec8a9','#a97ec8','#c87e8a','#7e9ec8','#c8c070','#e8905a','#70b8e8','#b8e870'];
+
+// ── SMARTER chart detection ──
+// Each column + dataset gets carefully analysed before picking chart
+const TIME_KW=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','january','february','march','april','june','july','august','september','october','november','december','q1','q2','q3','q4','week','day','hour','year','2019','2020','2021','2022','2023','2024','2025','monday','tuesday','wednesday','thursday','friday','saturday','sunday','mon','tue','wed','thu','fri','sat','sun'];
+const RANK_KW=['score','rank','ranking','rating','performance','grade','marks','points','top','best','position','percentile','gpa','cgpa'];
+const SHARE_KW=['percent','percentage','share','ratio','portion','distribution','allocation','split','proportion','mix'];
+const GROWTH_KW=['growth','change','increase','decrease','delta','diff','yoy','mom','trend','variance'];
+const VOLUME_KW=['volume','quantity','units','count','amount','revenue','sales','income','expense','profit','loss','total'];
+
+function smartDetectChart(labelCol, valueCol, labels, values){
+  const lc=labelCol.toLowerCase();
+  const vc=valueCol.toLowerCase();
+  const ll=labels.map(l=>String(l).toLowerCase());
+  const n=labels.length;
+
+  // Check if labels are time-based
+  const isTime=ll.some(l=>TIME_KW.some(t=>l.includes(t)))||colTypes[labelCol]==='date';
+
+  // Check value column name for hints
+  const isRank=RANK_KW.some(k=>vc.includes(k));
+  const isShare=SHARE_KW.some(k=>vc.includes(k)||lc.includes(k));
+  const isGrowth=GROWTH_KW.some(k=>vc.includes(k));
+  const isVolume=VOLUME_KW.some(k=>vc.includes(k));
+
+  // Check if values look like percentages (all between 0-100 and sum ~100)
+  const allPercent=values.every(v=>v>=0&&v<=100);
+  const sumsTo100=Math.abs(values.reduce((a,b)=>a+b,0)-100)<10;
+  const looksLikeShare=allPercent&&sumsTo100&&n<=10;
+
+  // Check trend in values (is it changing over time?)
+  const hasTrend=isTime&&values.length>2;
+
+  // Check if values have negatives (growth/variance)
+  const hasNegatives=values.some(v=>v<0);
+
+  // ── Decision tree ──
+
+  // Ranks/scores → Horizontal Bar (easiest to compare side by side)
+  if(isRank) return{type:'hbar',why:`"${valueCol}" looks like scores or rankings — horizontal bar makes comparison easy.`};
+
+  // Share/percentage data → Pie (if few items) or Doughnut
+  if(looksLikeShare||isShare){
+    return n<=6
+      ?{type:'pie',why:`"${valueCol}" values add up to ~100% — pie chart shows proportions.`}
+      :{type:'doughnut',why:`"${valueCol}" looks like shares — doughnut shows proportions cleanly.`};
+  }
+
+  // Growth/variance with negatives → Bar (shows positive/negative clearly)
+  if(isGrowth||hasNegatives) return{type:'bar',why:`"${valueCol}" has positive/negative values — bar chart shows gains and losses clearly.`};
+
+  // Time-based volume/sales → Area chart (shows accumulated volume over time)
+  if(isTime&&isVolume) return{type:'area',why:`"${valueCol}" is a volume metric over time — area chart shows the trend and magnitude.`};
+
+  // Time-based trend → Line chart
+  if(isTime||hasTrend) return{type:'line',why:`Labels like "${labels[0]}" are time periods — line chart shows trend over time.`};
+
+  // Many categories → Bar chart
+  if(n>8) return{type:'bar',why:`${n} categories — bar chart handles large comparisons best.`};
+
+  // Few categories (2-5) → Doughnut
+  if(n<=5) return{type:'doughnut',why:`Only ${n} items — doughnut chart gives clean visual comparison.`};
+
+  // Default → Bar
+  return{type:'bar',why:`Bar chart — best general-purpose chart for comparing "${valueCol}" across "${labelCol}".`};
+}
+
+// ── Natural Language Query Engine ──
+let nlActiveFilter=null; // stores current filter state
+let nlOriginalData=null; // backup of full dataset
+
+// Suggestion chips shown below input
+const NL_SUGGESTIONS=[
+  'show top 5','show bottom 5','filter last 3',
+  'highest value','lowest value','above average',
+  'compare first half vs second half','show only positive'
+];
+
+function buildNLSuggestions(){
+  const box=document.getElementById('nlSuggestions');
+  const chips=NL_SUGGESTIONS.map(s=>
+    `<button onclick="document.getElementById('nlInput').value='${s}';runNL()"
+      style="background:#0f0f0f;border:1px solid #1a1a1a;border-radius:20px;padding:4px 12px;font-size:10px;font-family:monospace;color:#444;cursor:pointer;transition:all .15s"
+      onmouseover="this.style.borderColor='#c8a96e';this.style.color='#c8a96e'"
+      onmouseout="this.style.borderColor='#1a1a1a';this.style.color='#444'">${s}</button>`
+  ).join('');
+  box.innerHTML=`<span style="font-size:10px;color:#333;font-family:monospace;padding-top:4px">Try →</span>${chips}`;
+}
+
+function parseNLQuery(query, labels, datasets, valueCols){
+  const q=query.toLowerCase().trim();
+  const n=labels.length;
+
+  // ── TOP N ──
+  const topMatch=q.match(/top\s*(\d+)/);
+  if(topMatch){
+    const k=Math.min(parseInt(topMatch[1]),n);
+    const col=valueCols[0];
+    const indexed=labels.map((l,i)=>({l,v:datasets[col][i],i}));
+    indexed.sort((a,b)=>b.v-a.v);
+    const top=indexed.slice(0,k);
+    return{
+      type:'filter',
+      indices:top.map(x=>x.i),
+      msg:`Showing top ${k} by ${col}`
+    };
+  }
+
+  // ── BOTTOM N ──
+  const botMatch=q.match(/bottom\s*(\d+)/);
+  if(botMatch){
+    const k=Math.min(parseInt(botMatch[1]),n);
+    const col=valueCols[0];
+    const indexed=labels.map((l,i)=>({l,v:datasets[col][i],i}));
+    indexed.sort((a,b)=>a.v-b.v);
+    const bot=indexed.slice(0,k);
+    return{
+      type:'filter',
+      indices:bot.map(x=>x.i),
+      msg:`Showing bottom ${k} by ${col}`
+    };
+  }
+
+  // ── LAST N ──
+  const lastMatch=q.match(/last\s*(\d+)/);
+  if(lastMatch){
+    const k=Math.min(parseInt(lastMatch[1]),n);
+    const indices=Array.from({length:k},(_,i)=>n-k+i);
+    return{type:'filter',indices,msg:`Showing last ${k} entries`};
+  }
+
+  // ── FIRST N ──
+  const firstMatch=q.match(/first\s*(\d+)/);
+  if(firstMatch){
+    const k=Math.min(parseInt(firstMatch[1]),n);
+    const indices=Array.from({length:k},(_,i)=>i);
+    return{type:'filter',indices,msg:`Showing first ${k} entries`};
+  }
+
+  // ── HIGHEST ──
+  if(q.includes('highest')||q.includes('maximum')||q.includes('max')||q.includes('best')){
+    const col=valueCols[0];
+    const maxVal=Math.max(...datasets[col]);
+    const idx=datasets[col].indexOf(maxVal);
+    return{
+      type:'highlight',
+      answer:`Highest ${col}: ${labels[idx]} with ${fmt(maxVal)}`,
+      indices:[idx]
+    };
+  }
+
+  // ── LOWEST ──
+  if(q.includes('lowest')||q.includes('minimum')||q.includes('min')||q.includes('worst')){
+    const col=valueCols[0];
+    const minVal=Math.min(...datasets[col]);
+    const idx=datasets[col].indexOf(minVal);
+    return{
+      type:'highlight',
+      answer:`Lowest ${col}: ${labels[idx]} with ${fmt(minVal)}`,
+      indices:[idx]
+    };
+  }
+
+  // ── ABOVE AVERAGE ──
+  if(q.includes('above average')||q.includes('above avg')){
+    const col=valueCols[0];
+    const avg=datasets[col].reduce((a,b)=>a+b,0)/datasets[col].length;
+    const indices=datasets[col].map((v,i)=>v>avg?i:-1).filter(i=>i>=0);
+    return{
+      type:'filter',
+      indices,
+      msg:`Showing ${indices.length} entries above average (${fmt(avg)})`
+    };
+  }
+
+  // ── BELOW AVERAGE ──
+  if(q.includes('below average')||q.includes('below avg')){
+    const col=valueCols[0];
+    const avg=datasets[col].reduce((a,b)=>a+b,0)/datasets[col].length;
+    const indices=datasets[col].map((v,i)=>v<avg?i:-1).filter(i=>i>=0);
+    return{
+      type:'filter',
+      indices,
+      msg:`Showing ${indices.length} entries below average (${fmt(avg)})`
+    };
+  }
+
+  // ── POSITIVE ONLY ──
+  if(q.includes('positive')||q.includes('profit')||q.includes('growth')){
+    const col=valueCols[0];
+    const indices=datasets[col].map((v,i)=>v>0?i:-1).filter(i=>i>=0);
+    return{type:'filter',indices,msg:`Showing ${indices.length} positive entries`};
+  }
+
+  // ── NEGATIVE ONLY ──
+  if(q.includes('negative')||q.includes('loss')||q.includes('decline')){
+    const col=valueCols[0];
+    const indices=datasets[col].map((v,i)=>v<0?i:-1).filter(i=>i>=0);
+    return{type:'filter',indices,msg:`Showing ${indices.length} negative/loss entries`};
+  }
+
+  // ── COMPARE HALVES ──
+  if(q.includes('first half')||q.includes('second half')||q.includes('compare')){
+    const mid=Math.floor(labels.length/2);
+    const col=valueCols[0];
+    const h1=datasets[col].slice(0,mid).reduce((a,b)=>a+b,0);
+    const h2=datasets[col].slice(mid).reduce((a,b)=>a+b,0);
+    const diff=((h2-h1)/Math.abs(h1)*100).toFixed(1);
+    return{
+      type:'highlight',
+      answer:`First half total: ${fmt(h1)} · Second half total: ${fmt(h2)} · Change: ${diff>0?'+':''}${diff}%`,
+      indices:null
+    };
+  }
+
+  // ── SEARCH BY LABEL NAME ──
+  const labelMatch=labels.findIndex(l=>String(l).toLowerCase().includes(q.replace(/show|filter|find|only/g,'').trim()));
+  if(labelMatch>=0){
+    return{
+      type:'filter',
+      indices:[labelMatch],
+      msg:`Showing results for "${labels[labelMatch]}"`
+    };
+  }
+
+  // ── TOTAL / SUM ──
+  if(q.includes('total')||q.includes('sum')){
+    const col=valueCols[0];
+    const total=datasets[col].reduce((a,b)=>a+b,0);
+    return{type:'highlight',answer:`Total ${col}: ${fmt(total)}`,indices:null};
+  }
+
+  // ── AVERAGE ──
+  if(q.includes('average')||q.includes('avg')||q.includes('mean')){
+    const col=valueCols[0];
+    const avg=datasets[col].reduce((a,b)=>a+b,0)/datasets[col].length;
+    return{type:'highlight',answer:`Average ${col}: ${fmt(avg)}`,indices:null};
+  }
+
+  return{type:'unknown',msg:'Could not understand query. Try: "top 5", "above average", "highest value", "last 3"'};
+}
+
+function runNL(){
+  const query=document.getElementById('nlInput').value.trim();
+  const resEl=document.getElementById('nlResult');
+  const errEl=document.getElementById('nlError');
+  resEl.style.display='none'; errEl.style.display='none';
+
+  if(!query){errEl.textContent='Please type a question first.';errEl.style.display='block';return;}
+  if(!window._rs){errEl.textContent='Please generate a report first.';errEl.style.display='block';return;}
+
+  const{labelCol,valueCols,labels,datasets}=window._rs;
+  const result=parseNLQuery(query,labels,datasets,valueCols);
+
+  if(result.type==='unknown'){
+    errEl.textContent=result.msg; errEl.style.display='block'; return;
+  }
+
+  if(result.type==='highlight'){
+    resEl.innerHTML=`<span style="color:#c8a96e">Answer:</span> ${result.answer}`;
+    resEl.style.display='block';
+    // Also filter charts if indices provided
+    if(result.indices){
+      applyFilterToCharts(result.indices,labels,datasets,valueCols,labelCol);
+      document.getElementById('nlResetBtn').style.display='inline-flex';
+    }
+    return;
+  }
+
+  if(result.type==='filter'){
+    resEl.innerHTML=`<span style="color:#7ec8a9">✓</span> ${result.msg}`;
+    resEl.style.display='block';
+    applyFilterToCharts(result.indices,labels,datasets,valueCols,labelCol);
+    document.getElementById('nlResetBtn').style.display='inline-flex';
+  }
+}
+
+function applyFilterToCharts(indices, labels, datasets, valueCols, labelCol){
+  const filteredLabels=indices.map(i=>labels[i]);
+  const filteredDatasets={};
+  valueCols.forEach(col=>{
+    filteredDatasets[col]=indices.map(i=>datasets[col][i]);
+  });
+
+  // Update all chart instances with filtered data
+  Object.entries(chartInst).forEach(([id,chart])=>{
+    if(id==='ch_combined'){
+      chart.data.labels=filteredLabels;
+      chart.data.datasets.forEach((ds,i)=>{
+        const col=valueCols[i];
+        if(col&&filteredDatasets[col]) ds.data=filteredDatasets[col];
+      });
+    } else {
+      chart.data.labels=filteredLabels;
+      if(chart.data.datasets[0]){
+        // Find which value col this chart belongs to
+        const ci=parseInt(id.split('_')[1]||0);
+        const col=valueCols[ci]||valueCols[0];
+        chart.data.datasets[0].data=filteredDatasets[col]||[];
+      }
+    }
+    chart.update('active');
+  });
+
+  // Update stats
+  const allNums=valueCols.flatMap(col=>filteredDatasets[col]||[]);
+  const total=allNums.reduce((a,b)=>a+b,0);
+  const avg=allNums.length?total/allNums.length:0;
+  const max=allNums.length?Math.max(...allNums):0;
+  const min=allNums.length?Math.min(...allNums.filter(v=>v>0)):0;
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><span class="sv">${fmt(total)}</span><span class="sl">Filtered total</span></div>
+    <div class="stat"><span class="sv">${fmt(avg)}</span><span class="sl">Average</span></div>
+    <div class="stat"><span class="sv">${fmt(max)}</span><span class="sl">Highest</span></div>
+    <div class="stat"><span class="sv">${fmt(min)}</span><span class="sl">Lowest</span></div>
+    <div class="stat"><span class="sv">${filteredLabels.length}</span><span class="sl">Filtered ${labelCol}s</span></div>
+    <div class="stat"><span class="sv">${valueCols.length}</span><span class="sl">Metrics</span></div>
+    <div class="stat"><span class="sv">${allData.length.toLocaleString()}</span><span class="sl">Total rows</span></div>`;
+}
+
+function resetNL(){
+  if(!window._rs)return;
+  const{labelCol,valueCols,labels,datasets}=window._rs;
+  // Restore all charts to full data
+  Object.entries(chartInst).forEach(([id,chart])=>{
+    if(id==='ch_combined'){
+      chart.data.labels=labels;
+      chart.data.datasets.forEach((ds,i)=>{
+        const col=valueCols[i];
+        if(col&&datasets[col]) ds.data=datasets[col];
+      });
+    } else {
+      chart.data.labels=labels;
+      if(chart.data.datasets[0]){
+        const ci=parseInt(id.split('_')[1]||0);
+        const col=valueCols[ci]||valueCols[0];
+        chart.data.datasets[0].data=datasets[col]||[];
+      }
+    }
+    chart.update('active');
+  });
+  // Restore stats
+  const allNums=valueCols.flatMap(col=>datasets[col]);
+  const total=allNums.reduce((a,b)=>a+b,0);
+  const avg=total/allNums.length;
+  const max=Math.max(...allNums);
+  const min=Math.min(...allNums.filter(v=>v>0));
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><span class="sv">${fmt(total)}</span><span class="sl">Grand total</span></div>
+    <div class="stat"><span class="sv">${fmt(avg)}</span><span class="sl">Average</span></div>
+    <div class="stat"><span class="sv">${fmt(max)}</span><span class="sl">Highest</span></div>
+    <div class="stat"><span class="sv">${fmt(min)}</span><span class="sl">Lowest</span></div>
+    <div class="stat"><span class="sv">${labels.length}</span><span class="sl">${labelCol}s</span></div>
+    <div class="stat"><span class="sv">${valueCols.length}</span><span class="sl">Metrics</span></div>
+    <div class="stat"><span class="sv">${allData.length.toLocaleString()}</span><span class="sl">Total rows</span></div>`;
+  document.getElementById('nlInput').value='';
+  document.getElementById('nlResult').style.display='none';
+  document.getElementById('nlError').style.display='none';
+  document.getElementById('nlResetBtn').style.display='none';
+}
+
+// ── Natural Language Query Engine ──
+function generateReport(){
+  const errBox=document.getElementById('reportError');
+  errBox.innerHTML='';
+  const labelCol=document.getElementById('labelSelect').value;
+  const valueCols=Array.from(document.getElementById('valueSelect').selectedOptions).map(o=>o.value);
+  if(!labelCol){errBox.innerHTML='<div class="error">Please select a label column.</div>';return;}
+  if(!valueCols.length){errBox.innerHTML='<div class="error">Please select at least one value column.</div>';return;}
+
+  Object.values(chartInst).forEach(c=>c.destroy());
+  chartInst={};
+
+  let labels=[...new Set(allData.map(r=>String(r[labelCol])))].filter(l=>l&&l!=='');
+  if(labels.length>60) labels=labels.slice(0,60);
+
+  const datasets={};
+  valueCols.forEach(col=>{
+    datasets[col]=labels.map(lbl=>{
+      const rows=allData.filter(r=>String(r[labelCol])===lbl);
+      const vals=rows.map(r=>parseFloat(String(r[col]).replace(/[₹$€£,%\s,]/g,''))).filter(v=>!isNaN(v));
+      return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+    });
+  });
+
+  const allNums=valueCols.flatMap(col=>datasets[col]);
+  const total=allNums.reduce((a,b)=>a+b,0);
+  const avg=total/allNums.length;
+  const max=Math.max(...allNums);
+  const min=Math.min(...allNums.filter(v=>v>0));
+  const fc=valueCols[0];
+  const maxIdx=datasets[fc].indexOf(Math.max(...datasets[fc]));
+  const trend=datasets[fc][datasets[fc].length-1]>datasets[fc][0]?'↑ Upward':'↓ Downward';
+
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><span class="sv">${fmt(total)}</span><span class="sl">Grand total</span></div>
+    <div class="stat"><span class="sv">${fmt(avg)}</span><span class="sl">Average</span></div>
+    <div class="stat"><span class="sv">${fmt(max)}</span><span class="sl">Highest</span></div>
+    <div class="stat"><span class="sv">${fmt(min)}</span><span class="sl">Lowest</span></div>
+    <div class="stat"><span class="sv">${labels.length}</span><span class="sl">${labelCol}s</span></div>
+    <div class="stat"><span class="sv">${valueCols.length}</span><span class="sl">Metrics</span></div>
+    <div class="stat"><span class="sv">${allData.length.toLocaleString()}</span><span class="sl">Total rows</span></div>`;
+  document.getElementById('summaryBadge').textContent=`${allData.length.toLocaleString()} rows analysed`;
+  document.getElementById('tagsRow').innerHTML=[
+    {t:`Label: ${labelCol}`,h:true},{t:trend,h:false},
+    {t:`Currency: ${activeCurrency}`,h:false},
+    {t:`Peak: ${labels[maxIdx]||'—'}`,h:false},
+    {t:`${allData.length} rows`,h:false}
+  ].map(({t,h})=>`<span class="tag ${h?'hl':''}">${t}</span>`).join('');
+
+  // ── Build charts ──
+  const grid=document.getElementById('chartsGrid');
+  grid.innerHTML='';
+
+  valueCols.forEach((col,ci)=>{
+    const {type:aiType, why}=smartDetectChart(labelCol,col,labels,datasets[col]);
+
+    // Always show AI-recommended chart first
+    makeChartCard(grid,`ch_${ci}_ai`,col,`${col} — AI recommended`,why,aiType,labels,datasets[col],ci);
+
+    // Then show other enabled chart types (skip if same as AI pick)
+    const allTypes=[
+      {ct:'bar',type:'bar',label:'Bar chart'},
+      {ct:'hbar',type:'hbar',label:'Horizontal bar'},
+      {ct:'line',type:'line',label:'Line chart'},
+      {ct:'area',type:'area',label:'Area chart'},
+      {ct:'pie',type:'pie',label:'Pie chart'},
+      {ct:'doughnut',type:'doughnut',label:'Doughnut chart'},
+      {ct:'radar',type:'radar',label:'Radar chart'},
+      {ct:'scatter',type:'scatter',label:'Scatter plot'},
+    ];
+
+    allTypes.forEach((t,ti)=>{
+      if(!enabledCT.has(t.ct))return;
+      if(t.type===aiType)return; // skip if same as AI pick
+      if((t.type==='pie'||t.type==='doughnut'||t.type==='radar')&&labels.length>14)return;
+      const id=`ch_${ci}_${ti}`;
+      makeChartCard(grid,id,col,`${col} — ${t.label}`,`Alternative view using ${t.label.toLowerCase()}.`,t.type,labels,datasets[col],ci);
+    });
+  });
+
+  // Combined chart for multiple value columns
+  if(valueCols.length>1){
+    const id='ch_combined';
+    const card=document.createElement('div');
+    card.className='cc cc-full';
+    card.innerHTML=`<div class="cc-title">Combined — all metrics vs ${labelCol}</div><div class="cc-why">All selected value columns compared side by side.</div><canvas id="${id}" style="max-height:260px"></canvas>`;
+    grid.appendChild(card);
+    setTimeout(()=>{
+      const ctx=document.getElementById(id)?.getContext('2d');
+      if(!ctx)return;
+      chartInst[id]=new Chart(ctx,{
+        type:'bar',
+        data:{labels,datasets:valueCols.map((col,i)=>({
+          label:col,data:datasets[col],
+          backgroundColor:PAL[i%PAL.length]+'bb',
+          borderColor:PAL[i%PAL.length],borderWidth:1.5,borderRadius:4
+        }))},
+        options:{responsive:true,plugins:{
+          legend:{display:true,labels:{color:'#555',font:{size:11},padding:12}},
+          tooltip:{backgroundColor:'#141414',borderColor:'#1a1a1a',borderWidth:1,bodyColor:'#aaa',padding:10,
+            callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y)}`}}},
+          scales:{
+            x:{ticks:{color:'#333',font:{size:10},maxRotation:40},grid:{color:'#0f0f0f'},border:{color:'#161616'}},
+            y:{ticks:{color:'#333',font:{size:10}},grid:{color:'#0f0f0f'},border:{color:'#161616'}}}}
+      });
+    },50);
+  }
+
+  // ── Insights ──
+  const ic=document.getElementById('insightsContainer');
+  ic.innerHTML='';
+  valueCols.forEach(col=>{
+    const vals=datasets[col];
+    const cm=Math.max(...vals),cn=Math.min(...vals);
+    const ca=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const ct2=vals.reduce((a,b)=>a+b,0);
+    const cmI=vals.indexOf(cm),cnI=vals.indexOf(cn);
+    const ab=vals.filter(v=>v>ca).length;
+    const gr=vals[0]!==0?((vals[vals.length-1]-vals[0])/Math.abs(vals[0])*100).toFixed(1):0;
+    const tr=vals[vals.length-1]>vals[0]?'upward 📈':'downward 📉';
+    const b=document.createElement('div');
+    b.className='ib';
+    b.innerHTML=`<div class="ib-label">${col}</div>
+    <p><strong>Total: ${fmt(ct2)}</strong> across ${labels.length} ${labelCol}s. Average: <strong>${fmt(ca)}</strong>.<br>
+    Best: <strong>${labels[cmI]||'—'}</strong> at <strong>${fmt(cm)}</strong> · Lowest: <strong>${labels[cnI]||'—'}</strong> at <strong>${fmt(cn)}</strong>.<br>
+    Overall trend is <strong>${tr}</strong> — ${gr>0?'+':''}${gr}% change start to end.<br>
+    <strong>${ab} of ${labels.length}</strong> ${labelCol}s performing above average.</p>`;
+    ic.appendChild(b);
+  });
+  const sb=document.createElement('div');
+  sb.className='ib';sb.style.borderColor='#7ec8a9';
+  sb.innerHTML=`<div class="ib-label" style="color:#7ec8a9">Overall summary</div>
+  <p><strong>${allData.length.toLocaleString()} rows</strong>, ${headers.length} columns, <strong>${valueCols.length} metric${valueCols.length>1?'s':''}</strong> analysed.<br>
+  Currency auto-detected: <strong>${(CUR[activeCurrency]||CUR.NONE).name}</strong>. Grand total: <strong>${fmt(total)}</strong>.</p>`;
+  ic.appendChild(sb);
+
+  window._rs={labelCol,valueCols,labels,datasets,total,avg,max,min,trend};
+  setStep(3);
+  buildNLSuggestions();
+}
+
+function makeChartCard(grid,id,col,title,why,type,labels,values,ci){
+  const card=document.createElement('div');
+  card.className='cc';
+  card.innerHTML=`<div class="cc-title">${title}</div><div class="cc-why">${why}</div><canvas id="${id}"></canvas>`;
+  grid.appendChild(card);
+  setTimeout(()=>renderChart(id,type,labels,values,col,ci),30);
+}
+
+function renderChart(id,type,labels,values,title,ci){
+  const ctx=document.getElementById(id)?.getContext('2d');
+  if(!ctx)return;
+  const color=PAL[ci%PAL.length];
+  const isPie=type==='pie'||type==='doughnut';
+  const isHBar=type==='hbar';
+  const isArea=type==='area';
+  const isRadar=type==='radar';
+  const isScatter=type==='scatter';
+  const chartType=isHBar?'bar':isArea?'line':isScatter?'scatter':isRadar?'radar':type;
+  const scatterD=isScatter?values.map((v,i)=>({x:i,y:v})):null;
+
+  const ds={
+    label:title,
+    data:isScatter?scatterD:values,
+    backgroundColor:isPie?PAL.slice(0,values.length).map(c=>c+'dd'):isRadar||isArea?color+'2a':color+'cc',
+    borderColor:isPie?'#0a0a0a':color,
+    borderWidth:isPie?2:1.5,
+    borderRadius:chartType==='bar'&&!isHBar?4:0,
+    tension:0.4,fill:isArea,
+    pointBackgroundColor:color,pointRadius:isScatter?4:2,pointHoverRadius:5
+  };
+
+  chartInst[id]=new Chart(ctx,{
+    type:chartType,
+    data:{labels:isScatter?undefined:labels,datasets:[ds]},
+    options:{
+      responsive:true,
+      indexAxis:isHBar?'y':undefined,
+      animation:{duration:450},
+      plugins:{
+        legend:{display:isPie,labels:{color:'#555',font:{size:10},padding:8,boxWidth:9}},
+        tooltip:{backgroundColor:'#141414',borderColor:'#1a1a1a',borderWidth:1,
+          titleColor:color,bodyColor:'#aaa',padding:9,
+          callbacks:{label:c=>' '+fmt(isScatter?c.parsed.y:(c.parsed.y??c.parsed))}}},
+      scales:isPie||isRadar?{}:{
+        x:{ticks:{color:'#333',font:{size:9},maxRotation:isHBar?0:40},grid:{color:'#0f0f0f'},border:{color:'#161616'}},
+        y:{ticks:{color:'#333',font:{size:9}},grid:{color:'#0f0f0f'},border:{color:'#161616'}}},
+      ...(isRadar?{scales:{r:{ticks:{color:'#333',font:{size:9},backdropColor:'transparent'},grid:{color:'#1a1a1a'},pointLabels:{color:'#444',font:{size:10}}}}}:{})
+    }
+  });
+}
+
+// ── PDF ──
+async function downloadPDF(){
+  if(!window._rs)return;
+  await new Promise(r=>setTimeout(r,500));
+  try{
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
+    const PW=595,PH=842,M=36;
+    const{labelCol,valueCols,labels,total,avg,max}=window._rs;
+    const addBg=()=>{doc.setFillColor(10,10,10);doc.rect(0,0,PW,PH,'F');};
+    addBg();
+    doc.setFillColor(200,169,110);doc.rect(0,0,PW,50,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(10,10,10);
+    doc.text('CHART REPORT MAKER',M,32);
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+    doc.text(new Date().toLocaleDateString('en-IN',{year:'numeric',month:'long',day:'numeric'}),PW-M,32,'right');
+    doc.setTextColor(200,169,110);doc.setFont('helvetica','bold');doc.setFontSize(17);
+    doc.text(`${labelCol} Report`,M,78);
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(70,70,70);
+    doc.text(`${allData.length.toLocaleString()} rows · ${valueCols.length} metrics · ${(CUR[activeCurrency]||CUR.NONE).name}`,M,94);
+    let y=112;
+    doc.setFillColor(18,18,18);doc.roundedRect(M,y,PW-2*M,56,5,5,'F');
+    const sL=['TOTAL','AVERAGE','HIGHEST','ROWS','METRICS'];
+    const sV=[fmt(total),fmt(avg),fmt(max),allData.length.toLocaleString(),String(valueCols.length)];
+    const cw=(PW-2*M)/sL.length;
+    sL.forEach((l,i)=>{
+      const cx=M+cw*i+cw/2;
+      doc.setTextColor(70,70,70);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(l,cx,y+15,'center');
+      doc.setTextColor(200,169,110);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(sV[i],cx,y+39,'center');
+    });
+    y+=72;
+    const ids=Object.keys(chartInst);
+    for(let i=0;i<ids.length;i++){
+      const canvas=document.getElementById(ids[i]);
+      if(!canvas)continue;
+      const img=canvas.toDataURL('image/png',1.0);
+      const ch=ids[i]==='ch_combined'?185:165;
+      if(y+ch+55>PH-38){doc.addPage();addBg();y=36;}
+      const tEl=canvas.closest('.cc')?.querySelector('.cc-title');
+      doc.setTextColor(200,169,110);doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.text(tEl?.textContent||'Chart',M,y+11);
+      doc.setFillColor(18,18,18);doc.roundedRect(M,y+14,PW-2*M,ch,4,4,'F');
+      doc.addImage(img,'PNG',M+5,y+18,PW-2*M-10,ch-8);
+      y+=ch+28;
+    }
+    if(y+38>PH-38){doc.addPage();addBg();y=36;}
+    doc.setTextColor(70,70,70);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('AI INSIGHTS',M,y);y+=14;
+    document.querySelectorAll('#insightsContainer .ib').forEach(box=>{
+      const title=box.querySelector('.ib-label')?.textContent||'';
+      const text=box.querySelector('p')?.textContent.replace(/\s+/g,' ').trim()||'';
+      const lines=doc.splitTextToSize(text,PW-2*M-16);
+      const bh=lines.length*13+24;
+      if(y+bh>PH-38){doc.addPage();addBg();y=36;}
+      doc.setFillColor(18,18,18);doc.roundedRect(M,y,PW-2*M,bh,4,4,'F');
+      doc.setFillColor(200,169,110);doc.rect(M,y,2.5,bh,'F');
+      doc.setTextColor(200,169,110);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text(title.toUpperCase(),M+9,y+10);
+      doc.setTextColor(140,140,140);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(lines,M+9,y+22);
+      y+=bh+9;
+    });
+    doc.setFillColor(16,16,16);doc.rect(0,PH-32,PW,32,'F');
+    doc.setFillColor(200,169,110);doc.rect(0,PH-32,PW,1.2,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,60,60);
+    doc.text('Generated by Chart Report Maker  •  AI-powered analytics',M,PH-11);
+    doc.setTextColor(200,169,110);doc.text(`Page ${doc.getNumberOfPages()}`,PW-M,PH-11,'right');
+    doc.save(`${labelCol}_Report.pdf`);
+  }catch(e){alert('PDF error: '+e.message);console.error(e);}
+}
+</script>
+</body>
+</html>
